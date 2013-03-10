@@ -1,0 +1,76 @@
+#!/bin/bash
+
+pre() {
+    # in the project folder
+    cd ../redberry-$3
+
+    # start hgFlow release
+    hg flow release start v$1
+
+    # change version and scm settings in the pom
+    xsltproc --stringparam releaseVersion $1 --stringparam release yes ../releaseScript/pomPrep.xsl pom.xml > pom1.xml
+    mv -f pom1.xml pom.xml
+
+    # build
+    mvn clean source:jar javadoc:jar install gpg:sign -Dgpg.passphrase
+    # -DskipTests
+
+    # creating bundle for oss
+    cd target
+    jar cf $3-bundle.jar $3-*
+
+    # moving bundle to rhe global terget
+    mv $3-bundle.jar ../../target
+    cd ..
+
+    # finishing hgFlow release
+    hg flow release finish v$1
+
+    # to develop branch
+    hg update develop
+}
+
+post(){
+    # in the project folder
+    cd ../redberry-$3
+
+    # changing version to the next with "-SNAPSHOT"
+    xsltproc --stringparam releaseVersion $2-SNAPSHOT --stringparam release no ../releaseScript/pomPrep.xsl pom.xml > pom1.xml
+    mv -f pom1.xml pom.xml
+
+    # commiting
+    hg commit -m "Next development cycle ($2)"
+}
+
+# clean global target
+rm -r ../target/*
+
+# firest stage of release
+pre $1 $2 core
+pre $1 $2 physics
+pre $1 $2 groovy
+
+# greating aggregated sources and javadocs
+cd ../redberry-pom
+xsltproc --stringparam releaseVersion $1 --stringparam release yes ../releaseScript/pomPrep.xsl pom.xml > pom1.xml
+mv -f pom1.xml pom.xml
+mvn javadoc:aggregate source:aggregate
+mv target/all-$1-sources.jar ../target/redberry-$1-all-in-one-source.jar
+mv target/site ../target/
+
+# generate all-in-one jar and groovydocs
+cd ../redberry-groovy
+mvn site assembly:single
+mv target/groovy-$1-lib-jar.jar ../target/redberry-$1-all-in-one.jar
+mv target/site/css ../target/site/
+mv target/site/groovydoc ../target/site/
+mv target/site/images ../target/site/
+
+# finishing release process
+post $1 $2 core
+post $1 $2 physics
+post $1 $2 groovy
+
+# zipping site data
+cd ../target
+zip -r site.zip site
