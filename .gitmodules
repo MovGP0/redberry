@@ -1,0 +1,9 @@
+[submodule "core"]
+	path = core
+	url = git://github.com/redberry-cas/core.git
+[submodule "physics"]
+	path = physics
+	url = git://github.com/redberry-cas/physics.git
+[submodule "groovy"]
+	path = groovy
+	url = git://github.com/redberry-cas/groovy.git
